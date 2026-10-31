@@ -360,7 +360,8 @@ function Invoke-Apps {
             $provs = @($provisioned | Where-Object { $_.DisplayName -like $pattern })
             if ($pkgs.Count -eq 0 -and $provs.Count -eq 0) { Add-Result $cat "app $pattern" 'SAME' 'not installed'; continue }
             if ($Mode -eq 'Audit') {
-                Add-Result $cat "app $pattern" 'WOULD' "installed $($pkgs.Count), provisioned $($provs.Count)"
+                $names = @($pkgs | Select-Object -First 5 | ForEach-Object { "$($_.PackageFullName) [$(@($_.PackageUserInformation | ForEach-Object { $_.InstallState }) -join '/')]" }) -join '; '
+                Add-Result $cat "app $pattern" 'WOULD' "installed $($pkgs.Count), provisioned $($provs.Count): $names"
                 continue
             }
             foreach ($p in ($pkgs | Sort-Object PackageFullName -Unique)) {
