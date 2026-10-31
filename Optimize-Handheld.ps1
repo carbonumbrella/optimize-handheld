@@ -183,7 +183,8 @@ function Add-Result([string]$Cat, [string]$Item, [string]$Status, [string]$Detai
 }
 
 function Get-ErrorText($e) {
-    return "$($e.Exception.GetType().Name): $($e.Exception.Message) @ $($e.InvocationInfo.ScriptLineNumber)"
+    $text = ($e.Exception.Message -replace '\s*[\r\n]+\s*', ' ').Trim()
+    return "$($e.Exception.GetType().Name): $text @ line $($e.InvocationInfo.ScriptLineNumber)"
 }
 
 function Save-State([hashtable]$Entry) {
@@ -381,7 +382,14 @@ function Invoke-Apps {
                 try {
                     Remove-AppxProvisionedPackage -Online -PackageName $p.PackageName -ErrorAction Stop | Out-Null
                     Add-Result $cat "provisioned $($p.DisplayName)" 'CHANGED' 'new users will not get it'
-                } catch { Add-Result $cat "provisioned $($p.DisplayName)" 'FAIL' (Get-ErrorText $_) }
+                } catch {
+                    # removing the other packages can take this one along ("file not found"): only a package that
+                    # is still provisioned is a real failure
+                    $err = Get-ErrorText $_
+                    $still = @(Get-AppxProvisionedPackage -Online -ErrorAction SilentlyContinue | Where-Object { $_.PackageName -eq $p.PackageName })
+                    if ($still.Count -eq 0) { Add-Result $cat "provisioned $($p.DisplayName)" 'CHANGED' 'gone with the other packages' }
+                    else { Add-Result $cat "provisioned $($p.DisplayName)" 'FAIL' $err }
+                }
             }
         }
     }
