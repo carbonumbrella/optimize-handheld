@@ -32,6 +32,10 @@
 
 **Не трогает:** Xbox, Game Bar, Gaming Services, Store, winget, Edge, Terminal, Calculator, Photos, Camera, Paint, Snipping Tool, Notepad, Family Safety, Windows Update, Защитник Windows, драйверы, утилиты производителей (MSI Center M, ClawTweaks, HidHide, Armoury Crate, Legion Space). Удаляется только то, что перечислено в таблице.
 
+## Что переключить вручную
+
+**ClawTweaks не работает при включённой «Целостности памяти».** Скрипт её не меняет. Если нужен ClawTweaks, выключи её сам: «Безопасность Windows → Безопасность устройства → Изоляция ядра → Целостность памяти», затем перезагрузись. Это снижает защиту Windows, поэтому без ClawTweaks трогать её незачем.
+
 ## Лог
 
 Каждый запуск пишет `logs\<режим>-<дата>.log` рядом со скриптом. Если что-то пошло не так, пришли этот файл. Имена учётной записи и компьютера в нём заменены.
