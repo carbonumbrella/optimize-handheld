@@ -1,0 +1,6 @@
+logs/
+*.log
+state-*.json
+CREDENTIALS.md
+.env
+*.zip
