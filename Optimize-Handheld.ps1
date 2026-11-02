@@ -6,13 +6,14 @@
 #   .\Optimize-Handheld.ps1 -Mode Apply              Apply the Standard level (asks to type YES)
 #   .\Optimize-Handheld.ps1 -Mode Apply -Level Full  Standard + the extras (see $Categories)
 #   .\Optimize-Handheld.ps1 -Mode Undo               Roll back the latest Apply (or -StateFile <path>)
+#   .\Optimize-Handheld.ps1 -Mode Savings            Compare memory and disk now with the first Apply (no UAC)
 #   -Only Apps,AI / -Skip AppsExtra                  Limit by category
 #   -Yes                                             No prompt (remote runs)   -NoElevate  Audit without UAC
 #
 # Keep this file ASCII: Windows PowerShell 5.1 misreads UTF-8 without a BOM.
 [CmdletBinding()]
 param(
-    [ValidateSet('Audit', 'Apply', 'Undo')][string]$Mode = 'Audit',
+    [ValidateSet('Audit', 'Apply', 'Undo', 'Savings')][string]$Mode = 'Audit',
     [ValidateSet('Standard', 'Full')][string]$Level = 'Standard',
     [string[]]$Only,
     [string[]]$Skip,
@@ -24,7 +25,7 @@ param(
     [switch]$Pause
 )
 
-$ScriptVersion = '1.0.1'
+$ScriptVersion = '1.0.2'
 $ErrorActionPreference = 'Continue'
 $ProgressPreference = 'SilentlyContinue'
 # "-Only A,B" arrives as one string through powershell -File (the launcher and the elevated restart use it)
@@ -37,7 +38,7 @@ $Categories = [ordered]@{
     Apps          = 1  # preinstalled apps nobody needs on a handheld
     AppsExtra     = 2  # small apps some people do use: Media Player, Clock, Maps, Phone Link, Quick Assist...
     AI            = 1  # Copilot app, on-device AI packages (Recall, Click to Do...), their policies
-    Policies      = 1  # suggestions, ads, Bing in Start, widgets, OneDrive auto-install
+    Policies      = 1  # suggestions, ads, Bing in Start, widgets, OneDrive sync
     Telemetry     = 1  # telemetry policy, DiagTrack, data collection tasks
     TelemetryExtra = 2 # compatibility appraiser and disk diagnostics tasks
     Capabilities  = 1  # legacy Windows components
@@ -141,7 +142,7 @@ $RunList = @(
 $Identity = [Security.Principal.WindowsIdentity]::GetCurrent()
 $IsAdmin = (New-Object Security.Principal.WindowsPrincipal($Identity)).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 
-if (-not $IsAdmin -and -not $NoElevate) {
+if (-not $IsAdmin -and -not $NoElevate -and $Mode -ne 'Savings') {
     $argv = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "`"$PSCommandPath`"", '-Mode', $Mode, '-Level', $Level)
     if ($Only) { $argv += '-Only'; $argv += ($Only -join ',') }
     if ($Skip) { $argv += '-Skip'; $argv += ($Skip -join ',') }
@@ -457,6 +458,12 @@ function Get-RamUsedGb {
     return [math]::Round(($o.TotalVisibleMemorySize - $o.FreePhysicalMemory) / 1MB, 2)
 }
 
+function Get-MemoryByProcess {
+    Get-Process | Group-Object ProcessName | ForEach-Object {
+        [pscustomobject]@{ Name = $_.Name; Mb = [math]::Round((($_.Group | Measure-Object WorkingSet64 -Sum).Sum) / 1MB); N = $_.Count }
+    }
+}
+
 function Write-Inventory {
     Write-Log '--- system'
     try {
@@ -485,9 +492,7 @@ function Write-Inventory {
 
     Write-Log '--- top memory users (candidates for future versions of this script)'
     try {
-        Get-Process | Group-Object ProcessName | ForEach-Object {
-            [pscustomobject]@{ Name = $_.Name; Mb = [math]::Round((($_.Group | Measure-Object WorkingSet64 -Sum).Sum) / 1MB); N = $_.Count }
-        } | Sort-Object Mb -Descending | Select-Object -First 20 | ForEach-Object { Write-Log ("  {0,6} MB x{1,-3} {2}" -f $_.Mb, $_.N, $_.Name) }
+        Get-MemoryByProcess | Sort-Object Mb -Descending | Select-Object -First 20 | ForEach-Object { Write-Log ("  {0,6} MB x{1,-3} {2}" -f $_.Mb, $_.N, $_.Name) }
     } catch { Write-Log "processes: $(Get-ErrorText $_)" 'Yellow' }
 
     Write-Log '--- autostart entries'
@@ -523,6 +528,128 @@ function Confirm-Yes([string]$Prompt) {
     return $false
 }
 
+# ------------------------------------------------------------------ savings
+function Get-Snapshot {
+    $os = Get-CimInstance Win32_OperatingSystem
+    $drive = Get-PSDrive ($env:SystemDrive.TrimEnd(':'))
+    return [pscustomobject]@{
+        Stamp = $Stamp; Level = $Level; Version = $ScriptVersion
+        RamGb = Get-RamUsedGb
+        UptimeHours = [math]::Round(((Get-Date) - $os.LastBootUpTime).TotalHours, 2)
+        DiskFreeGb = [math]::Round($drive.Free / 1GB, 1)
+        Packages = @(Get-AppxPackage -ErrorAction SilentlyContinue | ForEach-Object { $_.Name } | Sort-Object -Unique).Count
+        ProcessTotal = @(Get-Process).Count
+        Processes = @(Get-MemoryByProcess)
+    }
+}
+
+function Save-Baseline {
+    try { Get-Snapshot | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $LogDir "baseline-$Stamp.json") -Encoding UTF8 }
+    catch { Write-Log "No starting point for the savings check: $(Get-ErrorText $_)" 'Yellow' }
+}
+
+function ConvertFrom-LogNumber([string]$Text) {
+    # the log prints numbers in the local format: 8,7 or 8.7
+    $n = 0.0
+    if ([double]::TryParse(($Text -replace '\s', '' -replace ',', '.'), [Globalization.NumberStyles]::Float, [Globalization.CultureInfo]::InvariantCulture, [ref]$n)) { return $n }
+    return $null
+}
+
+# Older versions saved no baseline file. An Apply log that reached its steps holds the same numbers, for the top 20 only.
+function Read-LogBaseline([string]$File) {
+    $lines = @(Get-Content -LiteralPath $File -Encoding UTF8 -ErrorAction Stop)
+    if (-not ($lines -match ' --- steps$')) { return $null }
+    $rx = 'RAM: ([\d.,]+) GB used of .*, up (.+) h; free on \S+ ([\d.,]+) GB'
+    $ram = @($lines -match $rx) | Select-Object -First 1
+    if (-not $ram -or $ram -notmatch $rx) { return $null }
+    $ramGb, $uptime, $disk = (ConvertFrom-LogNumber $Matches[1]), (ConvertFrom-LogNumber $Matches[2]), (ConvertFrom-LogNumber $Matches[3])
+    $level = if ($lines[0] -match 'level (\w+)') { $Matches[1] } else { '?' }
+    $procs = @(); $inTop = $false; $packages = $null
+    for ($i = 0; $i -lt $lines.Count; $i++) {
+        if ($lines[$i] -match '--- top memory users') { $inTop = $true; continue }
+        if ($lines[$i] -match '--- installed Appx packages' -and ($i + 1) -lt $lines.Count) {
+            $packages = @(($lines[$i + 1] -replace '^\S+\s+', '') -split ',').Count
+        }
+        if ($inTop -and $lines[$i] -match ' --- ') { $inTop = $false; continue }
+        if ($inTop -and $lines[$i] -match '^\S+\s+(\d+) MB x(\d+)\s+(.+)$') {
+            $procs += [pscustomobject]@{ Name = $Matches[3].Trim(); Mb = [int]$Matches[1]; N = [int]$Matches[2] }
+        }
+    }
+    return [pscustomobject]@{ Level = $level; RamGb = $ramGb; UptimeHours = $uptime; DiskFreeGb = $disk; Packages = $packages; ProcessTotal = $null; Processes = $procs }
+}
+
+# The oldest Apply is the state before any change, so a later Standard or Full run still counts from the start.
+function Find-Baseline {
+    $items = @()
+    foreach ($f in (Get-ChildItem -LiteralPath $LogDir -Filter 'baseline-*.json' -ErrorAction SilentlyContinue)) {
+        $items += [pscustomobject]@{ Stamp = ($f.BaseName -replace '^baseline-', ''); Rank = 0; File = $f.FullName }
+    }
+    foreach ($f in (Get-ChildItem -LiteralPath $LogDir -Filter 'Apply-*.log' -ErrorAction SilentlyContinue)) {
+        $items += [pscustomobject]@{ Stamp = ($f.BaseName -replace '^Apply-', ''); Rank = 1; File = $f.FullName }
+    }
+    foreach ($i in ($items | Sort-Object Stamp, Rank)) {
+        try {
+            $b = if ($i.Rank -eq 0) { Get-Content -LiteralPath $i.File -Raw -Encoding UTF8 | ConvertFrom-Json } else { Read-LogBaseline $i.File }
+            if ($b) {
+                $b | Add-Member -Force NoteProperty Stamp $i.Stamp
+                $b | Add-Member -Force NoteProperty File $i.File
+                return $b
+            }
+        } catch { Write-Log "Skipped $($i.File): $(Get-ErrorText $_)" 'Yellow' }
+    }
+    return $null
+}
+
+function Write-SavingsRow([string]$Name, $Before, $Now, $Saved) {
+    Write-Log ('  {0,-28} {1,8} {2,8} {3,8}' -f $Name, $Before, $Now, $Saved)
+}
+
+function Invoke-Savings {
+    $base = Find-Baseline
+    if (-not $base) {
+        Write-Log "No finished Apply found in $LogDir, nothing to compare with. Keep this script next to the logs folder of the Apply." 'Yellow'
+        return
+    }
+    $now = Get-Snapshot
+    $applied = [datetime]::ParseExact($base.Stamp, 'yyyyMMdd-HHmmss', [Globalization.CultureInfo]::InvariantCulture)
+    $boot = (Get-CimInstance Win32_OperatingSystem).LastBootUpTime
+    Write-Log "Compared with the Apply of $($applied.ToString('yyyy-MM-dd HH:mm')), level $($base.Level): $($base.File)"
+    Write-Log "Uptime: $($base.UptimeHours) h before, $($now.UptimeHours) h now"
+    if ($boot -lt $applied) { Write-Log 'No reboot since that Apply: these numbers are not final. Reboot and run this again.' 'Yellow' }
+    elseif ($now.UptimeHours -lt 0.1) { Write-Log 'Windows started less than 6 minutes ago and is still loading: run this again a little later.' 'Yellow' }
+
+    Write-Log '--- totals' 'Cyan'
+    Write-SavingsRow '' 'before' 'now' 'saved'
+    Write-SavingsRow 'Used memory, GB' $base.RamGb $now.RamGb ([math]::Round($base.RamGb - $now.RamGb, 2))
+    Write-SavingsRow 'Free disk, GB' $base.DiskFreeGb $now.DiskFreeGb ([math]::Round($now.DiskFreeGb - $base.DiskFreeGb, 1))
+    if ($null -ne $base.Packages) { Write-SavingsRow 'Appx packages' $base.Packages $now.Packages ($base.Packages - $now.Packages) }
+    if ($null -ne $base.ProcessTotal) { Write-SavingsRow 'Processes' $base.ProcessTotal $now.ProcessTotal ($base.ProcessTotal - $now.ProcessTotal) }
+
+    $nowMb = @{}
+    foreach ($p in $now.Processes) { $nowMb[$p.Name] = [int]$p.Mb }
+    $baseMb = @{}
+    foreach ($p in $base.Processes) { $baseMb[$p.Name] = [int]$p.Mb }
+    $rows = @(foreach ($n in $baseMb.Keys) {
+        $cur = if ($nowMb.ContainsKey($n)) { $nowMb[$n] } else { 0 }
+        [pscustomobject]@{ Name = $n; Before = $baseMb[$n]; Now = $cur; Saved = $baseMb[$n] - $cur; Gone = -not $nowMb.ContainsKey($n) }
+    })
+    $partial = $null -eq $base.ProcessTotal
+    # a log holds only the top 20: a process missing from it may have been small, not absent
+    if (-not $partial) {
+        $rows += @(foreach ($n in $nowMb.Keys) {
+            if (-not $baseMb.ContainsKey($n)) { [pscustomobject]@{ Name = $n; Before = 0; Now = $nowMb[$n]; Saved = -$nowMb[$n]; Gone = $false } }
+        })
+    }
+    $gone = @($rows | Where-Object { $_.Gone })
+    Write-Log "--- processes, MB" 'Cyan'
+    Write-Log "Gone since then: $(($gone | Measure-Object Before -Sum).Sum) MB in $($gone.Count) processes$(if ($partial) { ' (the old log lists only the top 20)' })"
+    Write-Log 'Lower now:'
+    $rows | Where-Object { $_.Saved -ge 10 } | Sort-Object Saved -Descending | Select-Object -First 10 | ForEach-Object { Write-SavingsRow $_.Name $_.Before $_.Now $_.Saved }
+    Write-Log 'Higher now:'
+    $rows | Where-Object { $_.Saved -le -10 } | Sort-Object Saved | Select-Object -First 5 | ForEach-Object { Write-SavingsRow $_.Name $_.Before $_.Now $_.Saved }
+    Write-Log 'Programs opened by hand and Windows updates count too: read the process lists before trusting the totals.'
+}
+
 # ------------------------------------------------------------------ main
 $TierMax = if ($Level -eq 'Full') { 2 } else { 1 }
 $Failed = $false
@@ -536,13 +663,17 @@ try {
     $Build = [Environment]::OSVersion.Version.Build
     if ($Build -lt 19041) { Write-Log "Windows build $Build is too old: 19041 or newer is required." 'Red'; exit 2 }
 
-    $TargetSid = Get-TargetUserSid
-    if ($TargetSid -ne $Identity.User.Value) { Write-Log 'Elevated under another account: per-user settings go to the logged-on user.' 'Yellow' }
-    if (-not (Test-Path -LiteralPath "Registry::HKEY_USERS\$TargetSid")) { Write-Log 'User registry hive is not loaded: per-user items will fail.' 'Yellow' }
+    if ($Mode -ne 'Savings') {
+        $TargetSid = Get-TargetUserSid
+        if ($TargetSid -ne $Identity.User.Value) { Write-Log 'Elevated under another account: per-user settings go to the logged-on user.' 'Yellow' }
+        if (-not (Test-Path -LiteralPath "Registry::HKEY_USERS\$TargetSid")) { Write-Log 'User registry hive is not loaded: per-user items will fail.' 'Yellow' }
 
-    Write-Inventory
+        Write-Inventory
+    }
 
-    if ($Mode -eq 'Undo') {
+    if ($Mode -eq 'Savings') {
+        Invoke-Savings
+    } elseif ($Mode -eq 'Undo') {
         if (-not $IsAdmin) { Write-Log 'Undo needs administrator rights.' 'Red'; exit 2 }
         if (-not $Yes) {
             if (-not (Confirm-Yes 'Roll back the latest Apply? Type YES')) { exit 0 }
@@ -556,6 +687,7 @@ try {
             if (-not $Yes) {
                 if (-not (Confirm-Yes 'Apply these changes? Type YES')) { exit 0 }
             }
+            Save-Baseline
             if (-not $NoRestorePoint) {
                 try {
                     Checkpoint-Computer -Description "Optimize-Handheld $Stamp" -RestorePointType MODIFY_SETTINGS -ErrorAction Stop -WarningAction SilentlyContinue
@@ -574,7 +706,7 @@ try {
         if ($Mode -eq 'Apply') {
             Write-Log '--- must stay'
             Test-MustStay
-            Write-Log "RAM now $(Get-RamUsedGb) GB (before $ramBefore GB). The real number is after a reboot: run the audit then."
+            Write-Log "RAM now $(Get-RamUsedGb) GB (before $ramBefore GB). The real number is after a reboot: run the audit and the savings check then."
         }
     }
 } catch {

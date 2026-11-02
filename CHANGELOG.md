@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## 2026-11-02 - 1.0.2: savings check
+
+- New menu item and `-Mode Savings`, no UAC. Apply saves `baseline-<date>.json` after the confirmation, before any change.
+- The comparison uses the oldest Apply, so a later Full run still counts from the original state. Apply logs of older
+  versions serve as a baseline, since that is the only record on machines already tuned; they hold only the top 20.
+- The total RAM difference depends on open programs and uptime, so the list of processes gone is shown next to it.
+- OneDrive stays in Standard (user's decision). The README now says the policy blocks sync and how to lift it: Store
+  cannot help, since the app is not removed.
+
 ## 2026-11-02 - Field test on a Claw 8 EX AI+ (Arc G3 Extreme, 1.0.0, Standard)
 
 - First real run of the registry, service, capability and feature steps: no failures, and the audit after the reboot
