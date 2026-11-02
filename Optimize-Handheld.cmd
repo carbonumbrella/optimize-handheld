@@ -7,7 +7,7 @@ echo   Optimize-Handheld
 echo.
 echo   1  Audit: only check, change nothing (start here)
 echo   2  Apply Standard: safe set
-echo   3  Apply Full: Standard + small apps, WMIC, vendor background services
+echo   3  Apply Full: Standard + small apps, WMIC, vendor background services, OneDrive sync off
 echo   4  Undo the latest Apply
 echo   5  Check savings: compare with the state before Apply (reboot first)
 echo   6  Exit

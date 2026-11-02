@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 2026-11-02 - 1.0.3: OneDrive block moved to Full
+
+- `DisableFileSyncNGSC` is now in the new Full-tier category PoliciesExtra: it stops sync for anyone who uses OneDrive,
+  and Standard must be safe for anyone. This replaces the 1.0.2 decision to keep it in Standard.
+- A machine tuned earlier keeps the block until it is lifted by hand or by Undo; a Standard audit no longer reports it.
+
 ## 2026-11-02 - 1.0.2: savings check
 
 - New menu item and `-Mode Savings`, no UAC. Apply saves `baseline-<date>.json` after the confirmation, before any change.

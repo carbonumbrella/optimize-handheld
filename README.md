@@ -20,13 +20,14 @@
 |---|---|---|
 | Apps | Standard | Удаляет Clipchamp, Кортану, Bing News, Bing Weather, Bing Search, Get Help, Tips, Office Hub, Solitaire, новый Outlook, People, Power Automate, To Do, Dev Home, Почту и Календарь, Feedback Hub, Teams |
 | AI | Standard | Удаляет приложение Copilot и пакеты локального ИИ Windows (Recall, Click to Do и другие), отключает их политиками, запрещает Chrome скачивать Gemini Nano |
-| Policies | Standard | Отключает предложения приложений, рекламу, Bing в «Пуск», виджеты, синхронизацию OneDrive |
+| Policies | Standard | Отключает предложения приложений, рекламу, Bing в «Пуск», виджеты |
 | Telemetry | Standard | Отключает телеметрию, службу DiagTrack, задачи сбора данных |
 | Capabilities | Standard | Удаляет Steps Recorder, Internet Explorer, WordPad, Math Recognizer, PowerShell ISE, дополнительные обои, PowerShell 2.0, Work Folders |
 | UserTweaks | Standard | Отключает рекламный ID, рекомендации в «Пуск», кнопку виджетов |
 | RamTrim | Standard | Отключает предзагрузку Edge и Cross-device Resume |
 | LoginKeyboard | Standard | Сенсорная клавиатура работает на экране входа |
 | AppsExtra | Full | Удаляет Карты, Phone Link, CrossDevice, виджеты, Media Player, Кино и ТВ, Будильники, Запись голоса, Sticky Notes, Quick Assist |
+| PoliciesExtra | Full | Блокирует синхронизацию OneDrive. Приложение остаётся, но файлы перестают синхронизироваться |
 | TelemetryExtra | Full | Отключает задачи Compatibility Appraiser и Disk Diagnostics |
 | CapabilitiesExtra | Full | Удаляет WMIC и старый Windows Media Player. Некоторые установщики производителей вызывают WMIC |
 | RamTrimVendor | Full | Убирает из автозапуска Intel DSA, Logitech Options+, интерфейс Intel Graphics, аудиоэффекты DTS и intelliGo. **Звук может измениться** |
@@ -76,7 +77,7 @@
 
 Прежние значения сохраняются в `logs\state-<дата>.json`. Пункт **Undo** возвращает настройки реестра, службы, задачи и компоненты Windows. Для возврата компонентов нужен интернет. Удалённые приложения откат не возвращает: их ставят заново из Microsoft Store, а их список будет в логе.
 
-OneDrive скрипт не удаляет, а блокирует его синхронизацию политикой, поэтому переустановка из Store не поможет. Снять только эту блокировку можно из командной строки от имени администратора:
+OneDrive скрипт не удаляет, а на уровне Full блокирует его синхронизацию политикой (версии до 1.0.3 делали это и на Standard), поэтому переустановка из Store не поможет. Снять только эту блокировку можно из командной строки от имени администратора:
 
 ```
 reg delete "HKLM\SOFTWARE\Policies\Microsoft\Windows\OneDrive" /v DisableFileSyncNGSC /f

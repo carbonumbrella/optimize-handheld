@@ -25,7 +25,7 @@ param(
     [switch]$Pause
 )
 
-$ScriptVersion = '1.0.2'
+$ScriptVersion = '1.0.3'
 $ErrorActionPreference = 'Continue'
 $ProgressPreference = 'SilentlyContinue'
 # "-Only A,B" arrives as one string through powershell -File (the launcher and the elevated restart use it)
@@ -38,7 +38,8 @@ $Categories = [ordered]@{
     Apps          = 1  # preinstalled apps nobody needs on a handheld
     AppsExtra     = 2  # small apps some people do use: Media Player, Clock, Maps, Phone Link, Quick Assist...
     AI            = 1  # Copilot app, on-device AI packages (Recall, Click to Do...), their policies
-    Policies      = 1  # suggestions, ads, Bing in Start, widgets, OneDrive sync
+    Policies      = 1  # suggestions, ads, Bing in Start, widgets
+    PoliciesExtra = 2  # blocks OneDrive sync: the app stays, but it stops working for anyone who uses it
     Telemetry     = 1  # telemetry policy, DiagTrack, data collection tasks
     TelemetryExtra = 2 # compatibility appraiser and disk diagnostics tasks
     Capabilities  = 1  # legacy Windows components
@@ -79,7 +80,7 @@ $RegList = @(
     @('Policies', "$PolicyRoot\Explorer", 'DisableSearchBoxSuggestions', 1),
     @('Policies', 'HKLM\SOFTWARE\Policies\Microsoft\Dsh', 'AllowNewsAndInterests', 0),
     @('Policies', "$PolicyRoot\AdvertisingInfo", 'DisabledByGroupPolicy', 1),
-    @('Policies', "$PolicyRoot\OneDrive", 'DisableFileSyncNGSC', 1),
+    @('PoliciesExtra', "$PolicyRoot\OneDrive", 'DisableFileSyncNGSC', 1),
     @('Telemetry', "$PolicyRoot\DataCollection", 'AllowTelemetry', 0),
     @('Telemetry', "$PolicyRoot\DataCollection", 'DoNotShowFeedbackNotifications', 1),
     @('UserTweaks', 'USER\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager', 'FeatureManagementEnabled', 0),
