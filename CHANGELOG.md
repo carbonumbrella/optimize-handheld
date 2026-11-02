@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## 2026-11-02 - 1.0.1: confirmation accepts yes in any case
+
+- A run on a Claw 8 EX AI+ was cancelled at the prompt with no explanation, and the check was case-sensitive. The prompt
+  now accepts yes in any case and on the Russian layout, since it guards against accidents only, and a cancel logs the
+  answer and says nothing changed.
+- The "never changed" log section matched MSTeams through the Steam filter, though Standard removes Teams.
+
 ## 2026-11-01 - First version
 
 - Built from the Claw 8 AI+ ledger (WinMCPHuawei\BootCD\SYSTEM-CHANGES.md). Personal or device-only items are left

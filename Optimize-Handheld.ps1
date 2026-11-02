@@ -24,7 +24,7 @@ param(
     [switch]$Pause
 )
 
-$ScriptVersion = '1.0.0'
+$ScriptVersion = '1.0.1'
 $ErrorActionPreference = 'Continue'
 $ProgressPreference = 'SilentlyContinue'
 # "-Only A,B" arrives as one string through powershell -File (the launcher and the elevated restart use it)
@@ -478,7 +478,7 @@ function Write-Inventory {
             $s = Get-Service -Name $n -ErrorAction SilentlyContinue
             if ($s) { Write-Log "  service $n : $($s.StartType)/$($s.Status)" }
         }
-        foreach ($p in (Get-AppxPackage -ErrorAction SilentlyContinue | Where-Object { $_.Name -match 'ClawTweaks|MSI|ASUS|Armoury|Lenovo|Legion|Ayaneo|GPD|Steam' })) {
+        foreach ($p in (Get-AppxPackage -ErrorAction SilentlyContinue | Where-Object { $_.Name -match 'ClawTweaks|MSI|ASUS|Armoury|Lenovo|Legion|Ayaneo|GPD|\bSteam' })) {
             Write-Log "  app $($p.Name) $($p.Version)"
         }
     } catch { Write-Log "tools: $(Get-ErrorText $_)" 'Yellow' }
@@ -510,6 +510,19 @@ function Write-Inventory {
     catch { Write-Log "appx: $(Get-ErrorText $_)" 'Yellow' }
 }
 
+function Test-YesAnswer([string]$Answer) {
+    # yes in any case, also typed on a Russian keyboard layout (char codes: the script stays ASCII)
+    $a = "$Answer".Trim()
+    return ($a -eq 'yes') -or ($a -eq (-join ([char]0x43D, [char]0x443, [char]0x44B)))
+}
+
+function Confirm-Yes([string]$Prompt) {
+    $answer = Read-Host $Prompt
+    if (Test-YesAnswer $answer) { return $true }
+    Write-Log "Cancelled: the answer was '$answer', not YES. Nothing was changed. Run again and type YES to continue." 'Yellow'
+    return $false
+}
+
 # ------------------------------------------------------------------ main
 $TierMax = if ($Level -eq 'Full') { 2 } else { 1 }
 $Failed = $false
@@ -532,7 +545,7 @@ try {
     if ($Mode -eq 'Undo') {
         if (-not $IsAdmin) { Write-Log 'Undo needs administrator rights.' 'Red'; exit 2 }
         if (-not $Yes) {
-            if ((Read-Host 'Roll back the latest Apply? Type YES') -cne 'YES') { Write-Log 'Cancelled by the user.'; exit 0 }
+            if (-not (Confirm-Yes 'Roll back the latest Apply? Type YES')) { exit 0 }
         }
         Invoke-Undo
     } else {
@@ -541,7 +554,7 @@ try {
             $active = @($Categories.Keys | Where-Object { Test-Active $_ })
             Write-Log "Categories: $($active -join ', ')" 'Cyan'
             if (-not $Yes) {
-                if ((Read-Host 'Apply these changes? Type YES') -cne 'YES') { Write-Log 'Cancelled by the user.'; exit 0 }
+                if (-not (Confirm-Yes 'Apply these changes? Type YES')) { exit 0 }
             }
             if (-not $NoRestorePoint) {
                 try {
