@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## 2026-11-02 - Field test on a Claw 8 EX AI+ (Arc G3 Extreme, 1.0.0, Standard)
+
+- First real run of the registry, service, capability and feature steps: no failures, and the audit after the reboot
+  shows every Standard item in place (the only WOULD lines are Full-tier items). Undo is still untested on real data.
+- Standard is enough there: with 31.5 GB of RAM, Full would add about 300 MB and take audio services and small apps.
+- Open: DisableFileSyncNGSC blocks OneDrive sync, while the README only mentions auto-install.
+
 ## 2026-11-02 - 1.0.1: confirmation accepts yes in any case
 
 - A run on a Claw 8 EX AI+ was cancelled at the prompt with no explanation, and the check was case-sensitive. The prompt
