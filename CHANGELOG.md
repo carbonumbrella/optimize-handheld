@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## 2026-11-19 - 1.1.0: Power (S4 Hibernation), Memory (16 GB Pagefile), Display (Maintain Aspect Ratio)
+
+- Added Power category to Standard tier: configures full S4 hibernation, sets standby idle timeout to 0 (disabling Modern Standby S0 sleep), sets hibernation idle timeouts to 10m on DC and 60m on AC, remaps power and sleep buttons to hibernate, disables wake timers, unhides power settings in GUI, and disables Fast Startup (HiberbootEnabled = 0).
+- Added Memory category to Standard tier: disables Windows AutomaticManagedPagefile, establishes a static 16 GB pagefile (16384 MB min and max), and disables ClearPageFileAtShutdown to eliminate micro-stuttering and memory exhaustion in AAA titles.
+- Added Display category to Standard tier: automates GPU display scaling to Maintain Aspect Ratio (DISPLAYCONFIG_SCALING_ASPECTRATIOCENTEREDMAX via Windows CCD API) so non-native resolutions (e.g., 720p/800p) preserve aspect ratio without geometry distortion.
+- Added Undo support for Power and Memory categories in state file.
+
 ## 2026-11-02 - 1.0.3: OneDrive block moved to Full
 
 - `DisableFileSyncNGSC` is now in the new Full-tier category PoliciesExtra: it stops sync for anyone who uses OneDrive,

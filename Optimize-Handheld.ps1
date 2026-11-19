@@ -25,7 +25,7 @@ param(
     [switch]$Pause
 )
 
-$ScriptVersion = '1.0.3'
+$ScriptVersion = '1.1.0'
 $ErrorActionPreference = 'Continue'
 $ProgressPreference = 'SilentlyContinue'
 # "-Only A,B" arrives as one string through powershell -File (the launcher and the elevated restart use it)
@@ -48,6 +48,9 @@ $Categories = [ordered]@{
     RamTrim       = 1  # Edge preload, Cross-device Resume
     RamTrimVendor = 2  # vendor background services and autostarts; apps still open by hand. Changes audio effects!
     LoginKeyboard = 1  # touch keyboard works at the login screen (ARSO off)
+    Power         = 1  # S4 hibernation, disable standby (0m/0m), timeouts (10m DC / 60m AC), buttons to hibernate, wake timers off
+    Memory        = 1  # static 16 GB pagefile (16384 MB), disable automatic pagefile management
+    Display       = 1  # GPU display scaling: maintain aspect ratio (DISPLAYCONFIG_SCALING_ASPECTRATIOCENTEREDMAX)
 }
 
 $AppList = @{
@@ -99,7 +102,10 @@ $RegList = @(
     @('RamTrim', 'HKLM\SOFTWARE\Policies\Microsoft\Edge', 'BackgroundModeEnabled', 0),
     @('LoginKeyboard', 'HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System', 'DisableAutomaticRestartSignOn', 1),
     @('LoginKeyboard', 'HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Authentication\LogonUI', 'ShowTabletKeyboard', 1),
-    @('LoginKeyboard', 'USER\Software\Microsoft\TabletTip\1.7', 'EnableDesktopModeAutoInvoke', 1)
+    @('LoginKeyboard', 'USER\Software\Microsoft\TabletTip\1.7', 'EnableDesktopModeAutoInvoke', 1),
+    @('Power', 'HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Power', 'HiberbootEnabled', 0),
+    @('Power', 'HKLM\SYSTEM\CurrentControlSet\Control\Power\PowerSettings\238c9fa8-0aad-41ed-83f4-97be242c8f20\9d7815a6-7ee4-497e-8888-515a05f02364', 'Attributes', 2),
+    @('Power', 'HKLM\SYSTEM\CurrentControlSet\Control\Power\PowerSettings\4f971e89-eebd-4455-a8de-9e59040e7347\7648efa3-dd9c-4e3e-b566-50f929386280', 'Attributes', 2)
 )
 
 $ServiceList = @(
@@ -398,6 +404,287 @@ function Invoke-Apps {
     }
 }
 
+function Invoke-Power {
+    if (-not (Test-Active 'Power')) { return }
+    $subBtn = '4f971e89-eebd-4455-a8de-9e59040e7347'
+    $powerBtn = '7648efa3-dd9c-4e3e-b566-50f929386280'
+    $sleepBtn = '96996bc0-ad50-47ec-923b-6f41874dd9eb'
+    $subSleep = '238c9fa8-0aad-41ed-83f4-97be242c8f20'
+    $standbyTimeout = '29f6c1db-86da-48c5-9fdb-f2b67b1f44da'
+    $hibernateTimeout = '9d7815a6-7ee4-497e-8888-515a05f02364'
+    $wakeTimers = 'bd3b718a-0680-4d9d-8ab2-e1d2b4ac806d'
+    $schemes = @('scheme_current', '381b4222-f694-41f0-9685-ff5bb260df2e')
+
+    $activeSchemeGuid = (Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes' -ErrorAction SilentlyContinue).ActivePowerScheme
+    if (-not $activeSchemeGuid) { $activeSchemeGuid = '381b4222-f694-41f0-9685-ff5bb260df2e' }
+    $schemePath = "HKLM:\SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes\$activeSchemeGuid"
+    $regSleep = "$schemePath\$subSleep"
+    $regBtn = "$schemePath\$subBtn"
+
+    $curSleep = Get-ItemProperty "$regSleep\$standbyTimeout" -ErrorAction SilentlyContinue
+    $curHib = Get-ItemProperty "$regSleep\$hibernateTimeout" -ErrorAction SilentlyContinue
+    $curWake = Get-ItemProperty "$regSleep\$wakeTimers" -ErrorAction SilentlyContinue
+    $curPwr = Get-ItemProperty "$regBtn\$powerBtn" -ErrorAction SilentlyContinue
+    $curSlpBtn = Get-ItemProperty "$regBtn\$sleepBtn" -ErrorAction SilentlyContinue
+
+    $needsChange = $false
+    if ("$($curSleep.ACSettingIndex)" -ne '0' -or "$($curSleep.DCSettingIndex)" -ne '0') { $needsChange = $true }
+    if ("$($curHib.ACSettingIndex)" -ne '3600' -or "$($curHib.DCSettingIndex)" -ne '600') { $needsChange = $true }
+    if ("$($curPwr.ACSettingIndex)" -ne '2' -or "$($curPwr.DCSettingIndex)" -ne '2') { $needsChange = $true }
+    if ("$($curSlpBtn.ACSettingIndex)" -ne '2' -or "$($curSlpBtn.DCSettingIndex)" -ne '2') { $needsChange = $true }
+    if ("$($curWake.ACSettingIndex)" -ne '0' -or "$($curWake.DCSettingIndex)" -ne '0') { $needsChange = $true }
+
+    $detail = 'standby 0m/0m, hib 10m DC / 60m AC, buttons->hib, wake timers 0'
+    if (-not $needsChange) {
+        Add-Result 'Power' 'S4_Hibernation' 'SAME' $detail
+        return
+    }
+
+    if ($Mode -eq 'Audit') {
+        Add-Result 'Power' 'S4_Hibernation' 'WOULD' $detail
+        return
+    }
+
+    try {
+        Save-State @{
+            Type = 'Power'; Cat = 'Power'
+            SleepAC = $curSleep.ACSettingIndex; SleepDC = $curSleep.DCSettingIndex
+            HibAC = $curHib.ACSettingIndex; HibDC = $curHib.DCSettingIndex
+            PwrAC = $curPwr.ACSettingIndex; PwrDC = $curPwr.DCSettingIndex
+            SlpBtnAC = $curSlpBtn.ACSettingIndex; SlpBtnDC = $curSlpBtn.DCSettingIndex
+            WakeAC = $curWake.ACSettingIndex; WakeDC = $curWake.DCSettingIndex
+        }
+
+        & powercfg /hibernate on
+        & powercfg /h /type full
+        & powercfg /change standby-timeout-ac 0
+        & powercfg /change standby-timeout-dc 0
+        & powercfg /change hibernate-timeout-dc 10
+        & powercfg /change hibernate-timeout-ac 60
+
+        foreach ($sc in $schemes) {
+            & powercfg /setacvalueindex $sc $subBtn $powerBtn 2
+            & powercfg /setdcvalueindex $sc $subBtn $powerBtn 2
+            & powercfg /setacvalueindex $sc $subBtn $sleepBtn 2
+            & powercfg /setdcvalueindex $sc $subBtn $sleepBtn 2
+            & powercfg /setacvalueindex $sc $subSleep $wakeTimers 0
+            & powercfg /setdcvalueindex $sc $subSleep $wakeTimers 0
+        }
+        & powercfg /setactive scheme_current
+
+        Add-Result 'Power' 'S4_Hibernation' 'CHANGED' $detail
+    } catch {
+        Add-Result 'Power' 'S4_Hibernation' 'FAIL' (Get-ErrorText $_)
+    }
+}
+
+function Invoke-Memory {
+    if (-not (Test-Active 'Memory')) { return }
+    $memMgmtPath = 'HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management'
+    $desiredPagefile = @('c:\pagefile.sys 16384 16384')
+
+    try {
+        $cs = Get-CimInstance Win32_ComputerSystem -ErrorAction Stop
+        $currPagefile = (Get-ItemProperty -Path $memMgmtPath -Name 'PagingFiles' -ErrorAction SilentlyContinue).PagingFiles
+        $isAuto = $cs.AutomaticManagedPagefile
+        $currPfStr = ($currPagefile -join '; ')
+
+        $isSame = (-not $isAuto) -and ("$currPagefile" -eq "$desiredPagefile")
+        if ($isSame) {
+            Add-Result 'Memory' 'PagingFiles' 'SAME' '16384 16384 (16 GB fixed), auto off'
+            return
+        }
+
+        $was = "auto=$isAuto, paging=$currPfStr"
+        if ($Mode -eq 'Audit') {
+            Add-Result 'Memory' 'PagingFiles' 'WOULD' "fix 16 GB ($was)"
+            return
+        }
+
+        Save-State @{
+            Type = 'Memory'; Cat = 'Memory'
+            AutomaticManagedPagefile = $isAuto
+            PagingFiles = $currPagefile
+        }
+
+        if ($isAuto) {
+            Set-CimInstance -Query 'Select * from Win32_ComputerSystem' -Property @{ AutomaticManagedPagefile = $false } -ErrorAction Stop
+        }
+        Set-ItemProperty -Path $memMgmtPath -Name 'PagingFiles' -Value $desiredPagefile -Type MultiString -Force -ErrorAction Stop
+        New-ItemProperty -Path $memMgmtPath -Name 'ClearPageFileAtShutdown' -Value 0 -PropertyType DWord -Force -ErrorAction Stop | Out-Null
+
+        Add-Result 'Memory' 'PagingFiles' 'CHANGED' "16384 16384 (16 GB fixed, was $was)"
+    } catch {
+        Add-Result 'Memory' 'PagingFiles' 'FAIL' (Get-ErrorText $_)
+    }
+}
+
+function Invoke-Display {
+    if (-not (Test-Active 'Display')) { return }
+    try {
+        if (-not ([System.Management.Automation.PSTypeName]'DisplayScaler').Type) {
+            $csharp = @'
+using System;
+using System.Runtime.InteropServices;
+
+public class DisplayScaler {
+    [StructLayout(LayoutKind.Sequential)]
+    public struct LUID {
+        public uint LowPart;
+        public int HighPart;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct DISPLAYCONFIG_PATH_SOURCE_INFO {
+        public LUID adapterId;
+        public uint id;
+        public uint modeInfoIdx;
+        public uint statusFlags;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct DISPLAYCONFIG_RATIONAL {
+        public uint Numerator;
+        public uint Denominator;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct DISPLAYCONFIG_PATH_TARGET_INFO {
+        public LUID adapterId;
+        public uint id;
+        public uint modeInfoIdx;
+        public uint outputTechnology;
+        public uint rotation;
+        public uint scaling;
+        public DISPLAYCONFIG_RATIONAL refreshRate;
+        public uint scanLineOrdering;
+        public int targetAvailable;
+        public uint statusFlags;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct DISPLAYCONFIG_PATH_INFO {
+        public DISPLAYCONFIG_PATH_SOURCE_INFO sourceInfo;
+        public DISPLAYCONFIG_PATH_TARGET_INFO targetInfo;
+        public uint flags;
+    }
+
+    [StructLayout(LayoutKind.Explicit, Size = 64)]
+    public struct DISPLAYCONFIG_MODE_INFO {
+        [FieldOffset(0)] public uint infoType;
+        [FieldOffset(4)] public uint id;
+        [FieldOffset(8)] public LUID adapterId;
+    }
+
+    [DllImport("user32.dll")]
+    public static extern int GetDisplayConfigBufferSizes(uint flags, out uint numPathArrayElements, out uint numModeInfoArrayElements);
+
+    [DllImport("user32.dll")]
+    public static extern int QueryDisplayConfig(
+        uint flags,
+        ref uint numPathArrayElements,
+        [In, Out] DISPLAYCONFIG_PATH_INFO[] pathInfoArray,
+        ref uint numModeInfoArrayElements,
+        [In, Out] DISPLAYCONFIG_MODE_INFO[] modeInfoArray,
+        IntPtr currentTopologyId
+    );
+
+    [DllImport("user32.dll")]
+    public static extern int SetDisplayConfig(
+        uint numPathArrayElements,
+        [In] DISPLAYCONFIG_PATH_INFO[] pathArray,
+        uint numModeInfoArrayElements,
+        [In] DISPLAYCONFIG_MODE_INFO[] modeInfoArray,
+        uint flags
+    );
+
+    public const uint QDC_ONLY_ACTIVE_PATHS = 2;
+    public const uint SDC_APPLY = 0x00000080;
+    public const uint SDC_USE_SUPPLIED_DISPLAY_CONFIG = 0x00000020;
+    public const uint SDC_SAVE_TO_DATABASE = 0x00000200;
+    public const uint SDC_ALLOW_CHANGES = 0x00000400;
+
+    public const uint DISPLAYCONFIG_SCALING_ASPECTRATIOCENTEREDMAX = 4;
+
+    public static int QueryActiveScaling(out uint[] scalings) {
+        scalings = null;
+        uint pathCount, modeCount;
+        int err = GetDisplayConfigBufferSizes(QDC_ONLY_ACTIVE_PATHS, out pathCount, out modeCount);
+        if (err != 0) return err;
+
+        var paths = new DISPLAYCONFIG_PATH_INFO[pathCount];
+        var modes = new DISPLAYCONFIG_MODE_INFO[modeCount];
+        err = QueryDisplayConfig(QDC_ONLY_ACTIVE_PATHS, ref pathCount, paths, ref modeCount, modes, IntPtr.Zero);
+        if (err != 0) return err;
+
+        scalings = new uint[pathCount];
+        for (int i = 0; i < pathCount; i++) {
+            scalings[i] = paths[i].targetInfo.scaling;
+        }
+        return 0;
+    }
+
+    public static int ApplyAspectRatioScaling() {
+        uint pathCount, modeCount;
+        int err = GetDisplayConfigBufferSizes(QDC_ONLY_ACTIVE_PATHS, out pathCount, out modeCount);
+        if (err != 0) return err;
+
+        var paths = new DISPLAYCONFIG_PATH_INFO[pathCount];
+        var modes = new DISPLAYCONFIG_MODE_INFO[modeCount];
+        err = QueryDisplayConfig(QDC_ONLY_ACTIVE_PATHS, ref pathCount, paths, ref modeCount, modes, IntPtr.Zero);
+        if (err != 0) return err;
+
+        bool changed = false;
+        for (int i = 0; i < pathCount; i++) {
+            if (paths[i].targetInfo.scaling != DISPLAYCONFIG_SCALING_ASPECTRATIOCENTEREDMAX) {
+                paths[i].targetInfo.scaling = DISPLAYCONFIG_SCALING_ASPECTRATIOCENTEREDMAX;
+                changed = true;
+            }
+        }
+        if (!changed) return 0;
+
+        uint flags = SDC_APPLY | SDC_USE_SUPPLIED_DISPLAY_CONFIG | SDC_SAVE_TO_DATABASE | SDC_ALLOW_CHANGES;
+        return SetDisplayConfig(pathCount, paths, modeCount, modes, flags);
+    }
+}
+'@
+            Add-Type -TypeDefinition $csharp
+        }
+
+        $scalings = $null
+        $qErr = [DisplayScaler]::QueryActiveScaling([ref]$scalings)
+        if ($qErr -ne 0) {
+            Add-Result 'Display' 'MaintainAspectRatio' 'FAIL' "QueryDisplayConfig error $qErr"
+            return
+        }
+
+        $allAspect = $true
+        foreach ($s in $scalings) {
+            if ($s -ne 4) { $allAspect = $false }
+        }
+
+        if ($allAspect) {
+            Add-Result 'Display' 'MaintainAspectRatio' 'SAME' 'Maintain Aspect Ratio (4) active'
+            return
+        }
+
+        $curStr = ($scalings -join ', ')
+        if ($Mode -eq 'Audit') {
+            Add-Result 'Display' 'MaintainAspectRatio' 'WOULD' "set Maintain Aspect Ratio (was $curStr)"
+            return
+        }
+
+        $sErr = [DisplayScaler]::ApplyAspectRatioScaling()
+        if ($sErr -eq 0) {
+            Add-Result 'Display' 'MaintainAspectRatio' 'CHANGED' "Maintain Aspect Ratio set (was $curStr)"
+        } else {
+            Add-Result 'Display' 'MaintainAspectRatio' 'WARN' "SetDisplayConfig code $sErr (requires interactive desktop session)"
+        }
+    } catch {
+        Add-Result 'Display' 'MaintainAspectRatio' 'FAIL' (Get-ErrorText $_)
+    }
+}
+
 function Test-MustStay {
     try {
         $names = if ($IsAdmin) { @(Get-AppxPackage -AllUsers -ErrorAction Stop | ForEach-Object { $_.Name }) } else { @(Get-AppxPackage | ForEach-Object { $_.Name }) }
@@ -448,6 +735,45 @@ function Invoke-Undo {
                     Add-Result $e.Cat "feature $($e.Name)" 'CHANGED' 'enabled'
                 }
                 'App' { Add-Result $e.Cat "app $($e.Name)" 'WARN' 'cannot be restored here: reinstall it from the Microsoft Store' }
+                'Power' {
+                    if ($null -ne $e.SleepAC) {
+                        & powercfg /change standby-timeout-ac ([math]::Round($e.SleepAC / 60))
+                        & powercfg /change standby-timeout-dc ([math]::Round($e.SleepDC / 60))
+                    }
+                    if ($null -ne $e.HibAC) {
+                        & powercfg /change hibernate-timeout-ac ([math]::Round($e.HibAC / 60))
+                        & powercfg /change hibernate-timeout-dc ([math]::Round($e.HibDC / 60))
+                    }
+                    $subBtn = '4f971e89-eebd-4455-a8de-9e59040e7347'
+                    $powerBtn = '7648efa3-dd9c-4e3e-b566-50f929386280'
+                    $sleepBtn = '96996bc0-ad50-47ec-923b-6f41874dd9eb'
+                    $subSleep = '238c9fa8-0aad-41ed-83f4-97be242c8f20'
+                    $wakeTimers = 'bd3b718a-0680-4d9d-8ab2-e1d2b4ac806d'
+                    if ($null -ne $e.PwrAC) {
+                        & powercfg /setacvalueindex scheme_current $subBtn $powerBtn $e.PwrAC
+                        & powercfg /setdcvalueindex scheme_current $subBtn $powerBtn $e.PwrDC
+                    }
+                    if ($null -ne $e.SlpBtnAC) {
+                        & powercfg /setacvalueindex scheme_current $subBtn $sleepBtn $e.SlpBtnAC
+                        & powercfg /setdcvalueindex scheme_current $subBtn $sleepBtn $e.SlpBtnDC
+                    }
+                    if ($null -ne $e.WakeAC) {
+                        & powercfg /setacvalueindex scheme_current $subSleep $wakeTimers $e.WakeAC
+                        & powercfg /setdcvalueindex scheme_current $subSleep $wakeTimers $e.WakeDC
+                    }
+                    & powercfg /setactive scheme_current
+                    Add-Result $e.Cat 'Power settings' 'CHANGED' 'restored previous timeouts and button actions'
+                }
+                'Memory' {
+                    if ($null -ne $e.AutomaticManagedPagefile) {
+                        Set-CimInstance -Query 'Select * from Win32_ComputerSystem' -Property @{ AutomaticManagedPagefile = [bool]$e.AutomaticManagedPagefile } -ErrorAction Stop
+                    }
+                    $memMgmtPath = 'HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management'
+                    if ($null -ne $e.PagingFiles) {
+                        Set-ItemProperty -Path $memMgmtPath -Name 'PagingFiles' -Value @($e.PagingFiles) -Type MultiString -Force -ErrorAction Stop
+                    }
+                    Add-Result $e.Cat 'PagingFiles' 'CHANGED' "restored (auto=$($e.AutomaticManagedPagefile))"
+                }
             }
         } catch { Add-Result $e.Cat "$($e.Type) $($e.Name)" 'FAIL' (Get-ErrorText $_) }
     }
@@ -704,6 +1030,9 @@ try {
         Invoke-Services
         Invoke-Tasks
         Invoke-Capabilities
+        Invoke-Power
+        Invoke-Memory
+        Invoke-Display
         if ($Mode -eq 'Apply') {
             Write-Log '--- must stay'
             Test-MustStay

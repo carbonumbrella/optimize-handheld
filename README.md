@@ -29,7 +29,10 @@
 | Capabilities | Standard | Удаляет Steps Recorder, Internet Explorer, WordPad, Math Recognizer, PowerShell ISE, дополнительные обои, PowerShell 2.0, Work Folders |
 | UserTweaks | Standard | Отключает рекламный ID, рекомендации в «Пуск», кнопку виджетов |
 | RamTrim | Standard | Отключает предзагрузку Edge и Cross-device Resume |
-| LoginKeyboard | Standard | Сенсорная клавиатура работает на экране входа |
+| LoginKeyboard | Standard | Сенсорная клавиатура работает на экране входа (отключение политики ARSO) |
+| Power | Standard | Полная гибернация S4: отключение сна S0 (таймаут 0), автогибернация через 10 мин от батареи и 60 мин от сети, перевод кнопки питания и сна на гибернацию, отключение таймеров пробуждения, отключение быстрого запуска |
+| Memory | Standard | Фиксированный файл подкачки 16 ГБ (16384 МБ), отключение автоматического управления подкачкой Windows и очистки файла при выключении |
+| Display | Standard | Аппаратное масштабирование GPU с сохранением пропорций (Maintain Aspect Ratio) для корректного запуска игр в пониженном разрешении без искажения геометрии |
 | AppsExtra | Full | Удаляет Карты, Phone Link, CrossDevice, виджеты, Media Player, Кино и ТВ, Будильники, Запись голоса, Sticky Notes, Quick Assist |
 | PoliciesExtra | Full | Блокирует синхронизацию OneDrive. Приложение остаётся, но файлы перестают синхронизироваться |
 | TelemetryExtra | Full | Отключает задачи Compatibility Appraiser и Disk Diagnostics |
