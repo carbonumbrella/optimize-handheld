@@ -1,5 +1,9 @@
 # Optimize-Handheld
 
+[![release](https://img.shields.io/github/v/release/carbonumbrella/optimize-handheld?include_prereleases&label=release)](https://github.com/carbonumbrella/optimize-handheld/releases)
+
+**[Скачать последнюю версию (HandheldTune.zip)](https://github.com/carbonumbrella/optimize-handheld/releases)**
+
 Скрипт очистки и настройки Windows 10/11 для портативных ПК: в первую очередь MSI Claw, но подходит и для других. Собран по изменениям, которые были сделаны на Claw 8 AI+.
 
 ## Как запустить
