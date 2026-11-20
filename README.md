@@ -1,106 +1,77 @@
+[English](README.md) | [Русский](README_RU.md)
+
+> **[Download Latest Release (ZIP Asset)](https://github.com/carbonumbrella/optimize-handheld/releases/latest/download/HandheldTune.zip)** | **[Release Notes & Files](https://github.com/carbonumbrella/optimize-handheld/releases/latest)**
+
 # Optimize-Handheld
 
 [![release](https://img.shields.io/github/v/release/carbonumbrella/optimize-handheld?include_prereleases&label=release)](https://github.com/carbonumbrella/optimize-handheld/releases)
 
-**[Скачать последнюю версию (HandheldTune.zip)](https://github.com/carbonumbrella/optimize-handheld/releases)**
+Windows 10/11 debloat, memory optimization, and tuning script for handheld gaming PCs: designed primarily for MSI Claw (Claw 8 AI+, Claw 7 AI+, Claw A1M), but also compatible with other handheld devices. Built based on optimizations verified on the reference Claw 8 AI+.
 
-Скрипт очистки и настройки Windows 10/11 для портативных ПК: в первую очередь MSI Claw, но подходит и для других. Собран по изменениям, которые были сделаны на Claw 8 AI+.
+## How to Run
 
-## Как запустить
+Extract the archive to any folder and run `Optimize-Handheld.cmd` as Administrator (or right-click `Optimize-Handheld.ps1` -> Run with PowerShell):
 
-Распакуй архив в любую папку и запусти `Optimize-Handheld.cmd`:
+1. **Audit:** Inspects the system and changes nothing. Start here.
+2. **Apply Standard:** Recommended safe configuration.
+3. **Apply Full:** Standard tier plus optional vendor services, WMIC, and legacy apps.
+4. **Undo:** Roll back the latest applied state.
+5. **Check savings:** Compares RAM and disk space freed compared to baseline (requires reboot).
 
-1. **Audit**: только проверяет и ничего не меняет. Начни с него.
-2. **Apply Standard**: безопасный набор.
-3. **Apply Full**: Standard плюс то, чем некоторые всё же пользуются.
-4. **Undo**: откат последнего применения.
-5. **Check savings**: показывает, сколько памяти и места на диске освободилось.
+The script requests Administrator privileges automatically. Before applying changes, it prompts for confirmation by typing `YES` (case and keyboard layout tolerant: `yes`, `YES`, and `нуы` are accepted; any other input aborts) and attempts to create a Windows System Restore point. After applying, restart the device and run Audit again to verify.
 
-Скрипт сам запросит права администратора. Перед применением попросит ввести `YES` (регистр и раскладка не важны, подойдёт и `yes`, и `нуы`; любой другой ответ отменяет запуск) и попробует создать точку восстановления. После применения перезагрузи устройство и снова запусти аудит: он покажет, что всё осталось на месте. Сколько это дало, покажет пункт **Check savings**.
+## What It Changes
 
-## Что меняет
-
-| Категория | Уровень | Что делает |
+| Category | Tier | Description |
 |---|---|---|
-| Apps | Standard | Удаляет Clipchamp, Кортану, Bing News, Bing Weather, Bing Search, Get Help, Tips, Office Hub, Solitaire, новый Outlook, People, Power Automate, To Do, Dev Home, Почту и Календарь, Feedback Hub, Teams |
-| AI | Standard | Удаляет приложение Copilot и пакеты локального ИИ Windows (Recall, Click to Do и другие), отключает их политиками, запрещает Chrome скачивать Gemini Nano |
-| Policies | Standard | Отключает предложения приложений, рекламу, Bing в «Пуск», виджеты |
-| Telemetry | Standard | Отключает телеметрию, службу DiagTrack, задачи сбора данных |
-| Capabilities | Standard | Удаляет Steps Recorder, Internet Explorer, WordPad, Math Recognizer, PowerShell ISE, дополнительные обои, PowerShell 2.0, Work Folders |
-| UserTweaks | Standard | Отключает рекламный ID, рекомендации в «Пуск», кнопку виджетов |
-| RamTrim | Standard | Отключает предзагрузку Edge и Cross-device Resume |
-| LoginKeyboard | Standard | Сенсорная клавиатура работает на экране входа (отключение политики ARSO) |
-| Power | Standard | Полная гибернация S4: отключение сна S0 (таймаут 0), автогибернация через 10 мин от батареи и 60 мин от сети, перевод кнопки питания и сна на гибернацию, отключение таймеров пробуждения, отключение быстрого запуска |
-| Memory | Standard | Фиксированный файл подкачки 16 ГБ (16384 МБ), отключение автоматического управления подкачкой Windows и очистки файла при выключении |
-| Display | Standard | Аппаратное масштабирование GPU с сохранением пропорций (Maintain Aspect Ratio) для корректного запуска игр в пониженном разрешении без искажения геометрии |
-| AppsExtra | Full | Удаляет Карты, Phone Link, CrossDevice, виджеты, Media Player, Кино и ТВ, Будильники, Запись голоса, Sticky Notes, Quick Assist |
-| PoliciesExtra | Full | Блокирует синхронизацию OneDrive. Приложение остаётся, но файлы перестают синхронизироваться |
-| TelemetryExtra | Full | Отключает задачи Compatibility Appraiser и Disk Diagnostics |
-| CapabilitiesExtra | Full | Удаляет WMIC и старый Windows Media Player. Некоторые установщики производителей вызывают WMIC |
-| RamTrimVendor | Full | Убирает из автозапуска Intel DSA, Logitech Options+, интерфейс Intel Graphics, аудиоэффекты DTS и intelliGo. **Звук может измениться** |
+| Apps | Standard | Removes Clipchamp, Cortana, Bing News, Bing Weather, Bing Search, Get Help, Tips, Office Hub, Solitaire, new Outlook, People, Power Automate, To Do, Dev Home, Mail and Calendar, Feedback Hub, Teams |
+| AI | Standard | Removes Copilot app and on-device Windows AI packages (Recall, Click to Do), disables them via Group Policy, prevents Chrome from background downloading Gemini Nano |
+| Policies | Standard | Disables app suggestions, advertising ID, Bing web search in Start, widgets |
+| Telemetry | Standard | Disables diagnostic telemetry, DiagTrack service, background data collection tasks |
+| Capabilities | Standard | Removes Steps Recorder, Internet Explorer, WordPad, Math Recognizer, PowerShell ISE, legacy wallpapers, PowerShell 2.0, Work Folders |
+| UserTweaks | Standard | Disables advertising ID, Start menu recommendations, taskbar widgets button |
+| RamTrim | Standard | Disables Edge startup boost/background mode and Cross-device Resume |
+| LoginKeyboard | Standard | Enables touch keyboard on the Windows lock screen (disables ARSO policy) |
+| Power | Standard | Full S4 hibernation: disables S0 Modern Standby (timeout 0), sets auto-hibernation after 10 min on battery and 60 min on AC, maps power/sleep buttons to hibernate, disables wake timers and Fast Startup |
+| Memory | Standard | Static 16 GB pagefile (16384 MB), disables automatic dynamic pagefile resizing and pagefile wiping on shutdown |
+| Display | Standard | GPU hardware display scaling set to Maintain Aspect Ratio (DISPLAYCONFIG_SCALING_ASPECTRATIOCENTEREDMAX) for lower resolutions without distortion |
+| AppsExtra | Full | Removes Maps, Phone Link, CrossDevice, WebExperience, Media Player, Movies and TV, Clock, Voice Recorder, Sticky Notes, Quick Assist |
+| PoliciesExtra | Full | Blocks OneDrive synchronization via policy (OneDrive app stays, but background sync stops) |
+| TelemetryExtra | Full | Disables Compatibility Appraiser and Disk Diagnostics tasks |
+| CapabilitiesExtra | Full | Removes WMIC and legacy Windows Media Player (some vendor installers require WMIC) |
+| RamTrimVendor | Full | Disables startup of Intel DSA, Logitech Options+, Intel Graphics tray, DTS and intelliGo audio effects |
 
-**Не трогает:** Xbox, Game Bar, Gaming Services, Store, winget, Edge, Terminal, Calculator, Photos, Camera, Paint, Snipping Tool, Notepad, Family Safety, Windows Update, Защитник Windows, драйверы, утилиты производителей (MSI Center M, ClawTweaks, HidHide, Armoury Crate, Legion Space). Удаляется только то, что перечислено в таблице.
+**Protected Services (Never Touched):** Xbox, Game Bar, Gaming Services, Microsoft Store, winget, Edge, Windows Terminal, Calculator, Photos, Camera, Paint, Snipping Tool, Notepad, Family Safety, Windows Update, Windows Defender, hardware drivers, and vendor utilities (MSI Center M, ClawTweaks, HidHide, Armoury Crate, Legion Space). Only explicitly listed items are modified.
 
-## Что переключить вручную
+## Manual Steps
 
-**ClawTweaks не работает при включённой «Целостности памяти».** Скрипт её не меняет. Если нужен ClawTweaks, выключи её сам: «Безопасность Windows → Безопасность устройства → Изоляция ядра → Целостность памяти», затем перезагрузись. Это снижает защиту Windows, поэтому без ClawTweaks трогать её незачем.
+**ClawTweaks requires Memory Integrity (HVCI) disabled.** The script does not modify this kernel security setting. If you use ClawTweaks, disable it manually: Windows Security -> Device security -> Core isolation details -> Memory integrity (Off), then restart.
 
-## Проверка экономии
+## Savings Verification
 
-Применение запоминает, сколько было занято памяти и места на диске, а пункт **Check savings** сравнивает это с тем, что есть сейчас. Права администратора ему не нужны, и он ничего не меняет.
+The script records baseline memory and disk usage upon Apply. Selecting option **5 (Check savings)** compares current usage with the baseline without requiring Administrator privileges:
 
-1. Примени скрипт и перезагрузи устройство.
-2. Подожди несколько минут, пока Windows догрузится. Открой те же программы, что были открыты при применении, или закрой их.
-3. Запусти `Optimize-Handheld.cmd` и выбери пункт **5**. Папка `logs` должна лежать рядом со скриптом.
+1. Apply the script and reboot the device.
+2. Allow Windows to finish background loading (2 to 3 minutes).
+3. Run `Optimize-Handheld.cmd` and select option **5**.
 
-**Что покажет:**
+## Command Line Usage
 
-- **Итоги:** занятая память, свободное место на диске, число приложений и процессов: было, стало, сколько сэкономлено.
-- **Процессы:** сколько памяти занимали исчезнувшие процессы, что стало занимать меньше и что больше.
+```powershell
+# Standard apply
+.\Optimize-Handheld.ps1 -Mode Apply -Level Standard
 
-**Как читать результат:**
-
-- Самая надёжная цифра по памяти находится в строке `Gone since then`, она не зависит от других программ. Но проверь по списку ниже: туда попадает и программа, которую ты просто закрыл.
-- На итог по памяти влияют открытые программы и время после загрузки. Разница в десятки или сотни мегабайт может оказаться случайной.
-- На итог по диску влияют обновления Windows и установленные игры.
-- Сравнение всегда идёт с самым первым применением. Чтобы начать заново, удали из `logs` старые файлы `baseline-*.json` и `Apply-*.log`.
-- Если применение делала версия до 1.0.2, цифры берутся из её лога. Там только 20 самых больших процессов, поэтому список будет неполным.
-
-## Лог
-
-Каждый запуск пишет `logs\<режим>-<дата>.log` рядом со скриптом. Если что-то пошло не так, пришли этот файл. Имена учётной записи и компьютера в нём заменены.
-
-- **Состояния:**
-  - `SAME`: уже как нужно;
-  - `WOULD`: аудит изменил бы;
-  - `CHANGED`: изменено;
-  - `SKIP`: нет на этом устройстве;
-  - `WARN`: предупреждение;
-  - `NOADMIN`: нужны права администратора;
-  - `FAIL`: ошибка, с причиной и номером строки.
-- **Сведения об устройстве:** модель, процессор, версия Windows, главные потребители памяти, автозапуск, сторонние службы и список приложений. Это нужно, чтобы дополнять скрипт для новых устройств.
-
-## Откат
-
-Прежние значения сохраняются в `logs\state-<дата>.json`. Пункт **Undo** возвращает настройки реестра, службы, задачи и компоненты Windows. Для возврата компонентов нужен интернет. Удалённые приложения откат не возвращает: их ставят заново из Microsoft Store, а их список будет в логе.
-
-OneDrive скрипт не удаляет, а на уровне Full блокирует его синхронизацию политикой (версии до 1.0.3 делали это и на Standard), поэтому переустановка из Store не поможет. Снять только эту блокировку можно из командной строки от имени администратора:
-
-```
-reg delete "HKLM\SOFTWARE\Policies\Microsoft\Windows\OneDrive" /v DisableFileSyncNGSC /f
-```
-
-## После больших обновлений Windows
-
-Крупные обновления возвращают часть приложений и сбрасывают политики. Запусти аудит, и если он покажет `WOULD`, примени скрипт ещё раз.
-
-## Командная строка
-
-```
+# Custom category selection
 .\Optimize-Handheld.ps1 -Mode Apply -Level Standard -Skip Capabilities,AI
-.\Optimize-Handheld.ps1 -Mode Apply -Only Apps,Telemetry -Yes
-.\Optimize-Handheld.ps1 -Mode Undo -StateFile .\logs\state-20261101-120000.json
-.\Optimize-Handheld.ps1 -Mode Savings
+
+# Rollback
+.\Optimize-Handheld.ps1 -Mode Undo
 ```
 
-Проверка применения и отката на тестовом разделе реестра: `tests\Test-ApplyUndo.ps1`. Проверка сравнения: `tests\Test-Savings.ps1`.
+## Logs and Rollback
+
+Every execution writes a timestamped log to `logs\<mode>-<date>.log`. Previous registry and service states are recorded in `logs\state-<date>.json`. The **Undo** action restores registry settings, services, scheduled tasks, and Windows capabilities. Uninstalled Store apps can be reinstalled from the Microsoft Store.
+
+## License
+
+MIT License, see [LICENSE](LICENSE).
