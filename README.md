@@ -48,6 +48,12 @@ The script requests Administrator privileges automatically. Before applying chan
 
 **ClawTweaks requires Memory Integrity (HVCI) disabled.** The script does not modify this kernel security setting. If you use ClawTweaks, disable it manually: Windows Security -> Device security -> Core isolation details -> Memory integrity (Off), then restart.
 
+## Disabling BitLocker (Device Encryption)
+
+Windows 11 enables automatic BitLocker device encryption on many portable PCs out of the box. This places a constant background AES encryption overhead on CPU cores and the SSD controller during game asset streaming.
+
+Menu option **6 (Disable BitLocker)** checks protection status on drive C: and initiates background decryption. Decryption runs transparently in the background without requiring a system reboot.
+
 ## Savings Verification
 
 The script records baseline memory and disk usage upon Apply. Selecting option **5 (Check savings)** compares current usage with the baseline without requiring Administrator privileges:
