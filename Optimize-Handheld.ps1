@@ -22,7 +22,9 @@ param(
     [switch]$Yes,
     [switch]$NoElevate,
     [switch]$NoRestorePoint,
-    [switch]$Pause
+    [switch]$Pause,
+    [switch]$DisableDSA,
+    [switch]$DisableAudioEffects
 )
 
 $ScriptVersion = '1.2.0'
@@ -33,7 +35,7 @@ if ($Only) { $Only = @($Only -split ',' | Where-Object { $_ }) }
 if ($Skip) { $Skip = @($Skip -split ',' | Where-Object { $_ }) }
 
 # ------------------------------------------------------------------ what it does
-# Tier 1 = Standard, tier 2 = Full only. Full is everything done on the reference Claw 8 AI+.
+# Tier 1 = Standard, tier 2 = Full only, tier 3 = Optional (manual / prompted).
 $Categories = [ordered]@{
     Apps          = 1  # preinstalled apps nobody needs on a handheld
     AppsExtra     = 2  # small apps some people do use: Media Player, Clock, Maps, Phone Link, Quick Assist...
@@ -46,7 +48,9 @@ $Categories = [ordered]@{
     CapabilitiesExtra = 2 # WMIC (some vendor installers call it), old Windows Media Player
     UserTweaks    = 1  # per-user: suggestions, ads id, Start recommendations, widgets button
     RamTrim       = 1  # Edge preload, Cross-device Resume
-    RamTrimVendor = 2  # vendor background services and autostarts; apps still open by hand. Changes audio effects!
+    RamTrimVendor = 2  # vendor background services: Logitech Options+ and Intel Graphics tray
+    VendorDSA     = 3  # optional: Intel Driver & Support Assistant services
+    VendorAudio   = 3  # optional: DTS and intelliGo audio effects services (changes sound profile!)
     LoginKeyboard = 1  # touch keyboard works at the login screen (ARSO off)
     Power         = 1  # S4 hibernation, disable standby (0m/0m), timeouts (10m DC / 60m AC), buttons to hibernate, wake timers off
     Memory        = 1  # static 16 GB pagefile (16384 MB), disable automatic pagefile management
@@ -111,11 +115,11 @@ $RegList = @(
 $ServiceList = @(
     # category, service, target start type. Absent services are skipped (other vendors, other drivers).
     @('Telemetry', 'DiagTrack', 'Disabled'),
-    @('RamTrimVendor', 'DSAService', 'Manual'),
-    @('RamTrimVendor', 'DSAUpdateService', 'Manual'),
     @('RamTrimVendor', 'OptionsPlusUpdaterService', 'Manual'),
-    @('RamTrimVendor', 'DtsApo4Service', 'Manual'),
-    @('RamTrimVendor', 'IgoAudioService', 'Manual')
+    @('VendorDSA', 'DSAService', 'Manual'),
+    @('VendorDSA', 'DSAUpdateService', 'Manual'),
+    @('VendorAudio', 'DtsApo4Service', 'Manual'),
+    @('VendorAudio', 'IgoAudioService', 'Manual')
 )
 
 $TaskList = @(
@@ -155,7 +159,7 @@ if (-not $IsAdmin -and -not $NoElevate -and $Mode -ne 'Savings') {
     if ($Skip) { $argv += '-Skip'; $argv += ($Skip -join ',') }
     if ($StateFile) { $argv += '-StateFile'; $argv += "`"$StateFile`"" }
     if ($LogDir) { $argv += '-LogDir'; $argv += "`"$LogDir`"" }
-    foreach ($s in 'Yes', 'NoRestorePoint', 'Pause') { if ((Get-Variable $s).Value) { $argv += "-$s" } }
+    foreach ($s in 'Yes', 'NoRestorePoint', 'Pause', 'DisableDSA', 'DisableAudioEffects') { if ((Get-Variable $s).Value) { $argv += "-$s" } }
     try {
         Start-Process powershell.exe -Verb RunAs -ArgumentList $argv -ErrorAction Stop | Out-Null
         Write-Host 'Continues in the elevated window.'
@@ -203,6 +207,8 @@ function Save-State([hashtable]$Entry) {
 }
 
 function Test-Active([string]$Cat) {
+    if ($Cat -eq 'VendorDSA' -and $DisableDSA) { return $true }
+    if ($Cat -eq 'VendorAudio' -and $DisableAudioEffects) { return $true }
     if ($Only -and ($Only -notcontains $Cat)) { return $false }
     if ($Skip -and ($Skip -contains $Cat)) { return $false }
     if (-not $Only -and $Categories[$Cat] -gt $TierMax) { return $false }
@@ -1085,6 +1091,22 @@ try {
     } else {
         if ($Mode -eq 'Apply') {
             if (-not $IsAdmin) { Write-Log 'Apply needs administrator rights.' 'Red'; exit 2 }
+            if ($Level -eq 'Full' -and -not $Yes) {
+                if (-not $DisableDSA) {
+                    $hasDsa = (Get-Service -Name 'DSAService', 'DSAUpdateService' -ErrorAction SilentlyContinue).Count -gt 0
+                    if ($hasDsa) {
+                        $ansDsa = Read-Host 'Disable Intel Driver & Support Assistant (DSA) services? [y/N]'
+                        if (Test-YesAnswer $ansDsa) { $DisableDSA = $true }
+                    }
+                }
+                if (-not $DisableAudioEffects) {
+                    $hasAudio = (Get-Service -Name 'DtsApo4Service', 'IgoAudioService' -ErrorAction SilentlyContinue).Count -gt 0
+                    if ($hasAudio) {
+                        $ansAud = Read-Host 'Disable DTS and intelliGo audio effects (sound profile will change)? [y/N]'
+                        if (Test-YesAnswer $ansAud) { $DisableAudioEffects = $true }
+                    }
+                }
+            }
             $active = @($Categories.Keys | Where-Object { Test-Active $_ })
             Write-Log "Categories: $($active -join ', ')" 'Cyan'
             if (-not $Yes) {

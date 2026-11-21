@@ -42,7 +42,9 @@
 | PoliciesExtra | Full | Блокирует синхронизацию OneDrive. Приложение остаётся, но файлы перестают синхронизироваться |
 | TelemetryExtra | Full | Отключает задачи Compatibility Appraiser и Disk Diagnostics |
 | CapabilitiesExtra | Full | Удаляет WMIC и старый Windows Media Player. Некоторые установщики производителей вызывают WMIC |
-| RamTrimVendor | Full | Убирает из автозапуска Intel DSA, Logitech Options+, интерфейс Intel Graphics, аудиоэффекты DTS и intelliGo. **Звук может измениться** |
+| RamTrimVendor | Full | Убирает из автозапуска службу обновлений Logitech Options+ и трей интерфейса Intel Graphics. Службы Intel DSA и аудиоэффекты DTS/intelliGo вынесены в отдельные опциональные категории и по умолчанию не отключаются |
+| VendorDSA | Опционально | Отключение служб Intel Driver & Support Assistant (запрашивается при установке Full или через параметр -DisableDSA) |
+| VendorAudio | Опционально | Отключение служб обработки звука DTS и intelliGo (запрашивается при установке Full или через параметр -DisableAudioEffects). Звуковой профиль изменится! |
 
 **Не трогает:** Xbox, Game Bar, Gaming Services, Store, winget, Edge, Terminal, Calculator, Photos, Camera, Paint, Snipping Tool, Notepad, Family Safety, Windows Update, Защитник Windows, драйверы, утилиты производителей (MSI Center M, ClawTweaks, HidHide, Armoury Crate, Legion Space). Удаляется только то, что перечислено в таблице.
 

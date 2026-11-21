@@ -40,7 +40,9 @@ The script requests Administrator privileges automatically. Before applying chan
 | PoliciesExtra | Full | Blocks OneDrive synchronization via policy (OneDrive app stays, but background sync stops) |
 | TelemetryExtra | Full | Disables Compatibility Appraiser and Disk Diagnostics tasks |
 | CapabilitiesExtra | Full | Removes WMIC and legacy Windows Media Player (some vendor installers require WMIC) |
-| RamTrimVendor | Full | Disables startup of Intel DSA, Logitech Options+, Intel Graphics tray, DTS and intelliGo audio effects |
+| RamTrimVendor | Full | Disables startup of Logitech Options+ updater service and Intel Graphics tray autostart. Intel DSA and DTS/intelliGo audio services are now optional categories and left enabled by default |
+| VendorDSA | Optional | Disables Intel Driver & Support Assistant background services (prompted in Full mode or via -DisableDSA) |
+| VendorAudio | Optional | Disables DTS and intelliGo audio effect background services (prompted in Full mode or via -DisableAudioEffects). Sound profile will change! |
 
 **Protected Services (Never Touched):** Xbox, Game Bar, Gaming Services, Microsoft Store, winget, Edge, Windows Terminal, Calculator, Photos, Camera, Paint, Snipping Tool, Notepad, Family Safety, Windows Update, Windows Defender, hardware drivers, and vendor utilities (MSI Center M, ClawTweaks, HidHide, Armoury Crate, Legion Space). Only explicitly listed items are modified.
 

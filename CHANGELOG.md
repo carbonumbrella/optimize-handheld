@@ -1,10 +1,12 @@
 # CHANGELOG
 
-## 2026-11-22 - 1.2.0: BitLocker / Device Encryption management
+## 2026-11-22 - 1.2.0: BitLocker Management and Optional Vendor Services
 
 - Added dedicated BitLocker mode (`-Mode BitLocker`) and interactive menu option 6 in `Optimize-Handheld.cmd` to inspect encryption status on drive C: and disable BitLocker / device encryption.
 - Disabling BitLocker eliminates continuous background AES encryption overhead, lowering CPU usage and reducing storage I/O latency during handheld gaming.
 - Added inventory status reporting for BitLocker on drive C: in audit mode.
+- Separated Intel DSA and DTS/intelliGo audio processing from automatic vendor debloat into optional categories `VendorDSA` and `VendorAudio` (Tier 3). In Full interactive runs, user is prompted before disabling. Command line switches `-DisableDSA` and `-DisableAudioEffects` provide explicit control.
+- `RamTrimVendor` (Tier 2) now only handles Logitech Options+ updater service and Intel Graphics tray autostart.
 
 ## 2026-11-19 - 1.1.0: Power (S4 Hibernation), Memory (16 GB Pagefile), Display (Maintain Aspect Ratio)
 
