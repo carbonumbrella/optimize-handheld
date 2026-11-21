@@ -13,7 +13,7 @@
 # Keep this file ASCII: Windows PowerShell 5.1 misreads UTF-8 without a BOM.
 [CmdletBinding()]
 param(
-    [ValidateSet('Audit', 'Apply', 'Undo', 'Savings')][string]$Mode = 'Audit',
+    [ValidateSet('Audit', 'Apply', 'Undo', 'Savings', 'BitLocker')][string]$Mode = 'Audit',
     [ValidateSet('Standard', 'Full')][string]$Level = 'Standard',
     [string[]]$Only,
     [string[]]$Skip,
@@ -25,7 +25,7 @@ param(
     [switch]$Pause
 )
 
-$ScriptVersion = '1.1.0'
+$ScriptVersion = '1.2.0'
 $ErrorActionPreference = 'Continue'
 $ProgressPreference = 'SilentlyContinue'
 # "-Only A,B" arrives as one string through powershell -File (the launcher and the elevated restart use it)
@@ -840,6 +840,19 @@ function Write-Inventory {
     Write-Log '--- installed Appx packages (current user)'
     try { Write-Log ('  ' + ((Get-AppxPackage -ErrorAction Stop | ForEach-Object { $_.Name } | Sort-Object -Unique) -join ', ')) }
     catch { Write-Log "appx: $(Get-ErrorText $_)" 'Yellow' }
+
+    Write-Log '--- BitLocker status (C:)'
+    try {
+        $bl = Get-BitLockerVolume -MountPoint 'C:' -ErrorAction SilentlyContinue
+        if ($bl) {
+            Write-Log "  C: Protection=$($bl.ProtectionStatus), Status=$($bl.VolumeStatus) ($($bl.EncryptionPercentage)% encrypted)"
+        } else {
+            $bdeOut = & manage-bde.exe -status C: 2>&1
+            $mProt = ($bdeOut | Select-String "Protection Status:\s+(.*)").Matches.Groups[1].Value.Trim()
+            $mStatus = ($bdeOut | Select-String "Conversion Status:\s+(.*)").Matches.Groups[1].Value.Trim()
+            if ($mProt) { Write-Log "  C: Protection=$mProt, Status=$mStatus" }
+        }
+    } catch { }
 }
 
 function Test-YesAnswer([string]$Answer) {
@@ -977,6 +990,67 @@ function Invoke-Savings {
     Write-Log 'Programs opened by hand and Windows updates count too: read the process lists before trusting the totals.'
 }
 
+# ------------------------------------------------------------------ bitlocker
+function Invoke-BitLocker {
+    Write-Log '--- BitLocker / Device Encryption' 'Cyan'
+    if (-not $IsAdmin) { Write-Log 'BitLocker management requires administrator rights.' 'Red'; exit 2 }
+    try {
+        $bl = Get-BitLockerVolume -MountPoint 'C:' -ErrorAction SilentlyContinue
+        $prot = if ($bl) { "$($bl.ProtectionStatus)" } else { '' }
+        $status = if ($bl) { "$($bl.VolumeStatus)" } else { '' }
+        $pct = if ($bl) { "$($bl.EncryptionPercentage)" } else { '0' }
+
+        if (-not $bl) {
+            $out = & manage-bde.exe -status C: 2>&1
+            $mProt = ($out | Select-String "Protection Status:\s+(.*)").Matches.Groups[1].Value.Trim()
+            $mStatus = ($out | Select-String "Conversion Status:\s+(.*)").Matches.Groups[1].Value.Trim()
+            $mPct = ($out | Select-String "Percentage Encrypted:\s+(.*)%").Matches.Groups[1].Value.Trim()
+            $prot = if ($mProt) { $mProt } else { 'Unknown' }
+            $status = if ($mStatus) { $mStatus } else { 'Unknown' }
+            $pct = if ($mPct) { $mPct } else { '0' }
+        }
+
+        $isEncrypted = ($prot -eq 'On') -or ($status -match 'Encrypted|EncryptionInProgress') -or ([int]$pct -gt 0)
+        $summary = "Protection: $prot, Status: $status, Encrypted: $pct%"
+
+        if (-not $isEncrypted) {
+            Write-Log "BitLocker on drive C: is already disabled ($summary)." 'Green'
+            Add-Result 'BitLocker' 'Drive_C' 'SAME' $summary
+            return
+        }
+
+        Write-Log "BitLocker / Device Encryption is currently ACTIVE on C: ($summary)." 'Yellow'
+        Write-Log "Disabling BitLocker eliminates continuous background AES encryption overhead and reduces CPU/SSD load during gaming." 'Yellow'
+        Write-Log "Decryption runs in the background and may take some minutes depending on drive capacity and usage." 'Yellow'
+
+        if (-not $Yes) {
+            if (-not (Confirm-Yes 'Disable BitLocker and decrypt drive C:? Type YES')) {
+                Add-Result 'BitLocker' 'Drive_C' 'SKIP' 'User declined'
+                return
+            }
+        }
+
+        Write-Log "Starting decryption on drive C:..." 'Cyan'
+        $done = $false
+        try {
+            Disable-BitLocker -MountPoint 'C:' -ErrorAction Stop | Out-Null
+            $done = $true
+        } catch {
+            $out = & manage-bde.exe -off C: 2>&1
+            if ($LASTEXITCODE -eq 0 -or "$out" -match 'decryption is now in progress') { $done = $true }
+            else { throw "$out" }
+        }
+
+        if ($done) {
+            Add-Result 'BitLocker' 'Drive_C' 'CHANGED' "Decryption started (was $summary)"
+            Write-Log "Decryption initiated successfully. Windows is now decrypting drive C: in the background." 'Green'
+            Write-Log "You can check progress in Windows Terminal with: manage-bde -status C:" 'Cyan'
+        }
+    } catch {
+        Add-Result 'BitLocker' 'Drive_C' 'FAIL' (Get-ErrorText $_)
+    }
+}
+
 # ------------------------------------------------------------------ main
 $TierMax = if ($Level -eq 'Full') { 2 } else { 1 }
 $Failed = $false
@@ -1000,6 +1074,8 @@ try {
 
     if ($Mode -eq 'Savings') {
         Invoke-Savings
+    } elseif ($Mode -eq 'BitLocker') {
+        Invoke-BitLocker
     } elseif ($Mode -eq 'Undo') {
         if (-not $IsAdmin) { Write-Log 'Undo needs administrator rights.' 'Red'; exit 2 }
         if (-not $Yes) {

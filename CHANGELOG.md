@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 2026-11-22 - 1.2.0: BitLocker / Device Encryption management
+
+- Added dedicated BitLocker mode (`-Mode BitLocker`) and interactive menu option 6 in `Optimize-Handheld.cmd` to inspect encryption status on drive C: and disable BitLocker / device encryption.
+- Disabling BitLocker eliminates continuous background AES encryption overhead, lowering CPU usage and reducing storage I/O latency during handheld gaming.
+- Added inventory status reporting for BitLocker on drive C: in audit mode.
+
 ## 2026-11-19 - 1.1.0: Power (S4 Hibernation), Memory (16 GB Pagefile), Display (Maintain Aspect Ratio)
 
 - Added Power category to Standard tier: configures full S4 hibernation, sets standby idle timeout to 0 (disabling Modern Standby S0 sleep), sets hibernation idle timeouts to 10m on DC and 60m on AC, remaps power and sleep buttons to hibernate, disables wake timers, unhides power settings in GUI, and disables Fast Startup (HiberbootEnabled = 0).

@@ -17,6 +17,7 @@ Extract the archive to any folder and run `Optimize-Handheld.cmd` as Administrat
 3. **Apply Full:** Standard tier plus optional vendor services, WMIC, and legacy apps.
 4. **Undo:** Roll back the latest applied state.
 5. **Check savings:** Compares RAM and disk space freed compared to baseline (requires reboot).
+6. **Disable BitLocker:** Checks encryption status and decrypts system drive C: to reduce background SSD and CPU load during gaming.
 
 The script requests Administrator privileges automatically. Before applying changes, it prompts for confirmation by typing `YES` (case and keyboard layout tolerant: `yes`, `YES`, and `нуы` are accepted; any other input aborts) and attempts to create a Windows System Restore point. After applying, restart the device and run Audit again to verify.
 
